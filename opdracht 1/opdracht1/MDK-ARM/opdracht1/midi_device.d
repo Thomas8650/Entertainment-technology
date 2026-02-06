@@ -1,0 +1,19 @@
+opdracht1/midi_device.o: \
+  ..\MiddlewaresThird_PartyTinyUSB\src\class\midi\midi_device.c \
+  ..\MiddlewaresThird_PartyTinyUSB\src\tusb_option.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_compiler.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\tusb_config.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_mcu.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\device\usbd.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_common.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_verify.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_types.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_debug.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\device\usbd_pvt.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\osal\osal.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\osal\osal_none.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_fifo.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\common\tusb_private.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\class\midi\midi_device.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\class\audio\audio.h \
+  ..\MiddlewaresThird_PartyTinyUSB\src\class\midi\midi.h
