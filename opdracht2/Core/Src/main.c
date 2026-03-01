@@ -91,73 +91,6 @@ uint32_t tusb_time_millis_api(void) {
   return HAL_GetTick();
 }
 
-int __io_putchar(int ch) {
-  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
-
-int fputc(int ch, FILE *f) {
-  (void)f;
-  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-  return ch;
-}
-
-int _write(int file, char *ptr, int len) {
-  (void)file;
-  HAL_UART_Transmit(&huart2, (uint8_t *)ptr, (uint16_t)len, HAL_MAX_DELAY);
-  return len;
-}
-
-static void UART_DebugRaw(const char *msg) {
-  HAL_UART_Transmit(&huart2, (uint8_t *)msg, (uint16_t)strlen(msg), HAL_MAX_DELAY);
-}
-
-static void Debug_LED_RawInit(void) {
-  GPIO_InitTypeDef gpio = {0};
-
-  LED2_GPIO_CLK_ENABLE();
-  gpio.Pin = LED2_PIN;
-  gpio.Mode = GPIO_MODE_OUTPUT_PP;
-  gpio.Pull = GPIO_NOPULL;
-  gpio.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED2_GPIO_PORT, &gpio);
-  HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-}
-
-static void Debug_BusyWait(volatile uint32_t cycles) {
-  while (cycles--) {
-    __NOP();
-  }
-}
-
-static void Debug_Blink(uint8_t pulses, uint32_t on_ms, uint32_t off_ms) {
-  for (uint8_t i = 0; i < pulses; i++) {
-    BSP_LED_On(LED_GREEN);
-    HAL_Delay(on_ms);
-    BSP_LED_Off(LED_GREEN);
-    HAL_Delay(off_ms);
-  }
-  HAL_Delay(180);
-}
-
-static void Debug_RawPulse(uint8_t pulses) {
-  for (uint8_t i = 0; i < pulses; i++) {
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-    Debug_BusyWait(1400000U);
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-    Debug_BusyWait(1400000U);
-  }
-  Debug_BusyWait(3000000U);
-}
-
-#if defined(__ICCARM__)
-size_t __write(int handle, const unsigned char *buf, size_t size) {
-  (void)handle;
-  HAL_UART_Transmit(&huart2, (uint8_t *)buf, (uint16_t)size, HAL_MAX_DELAY);
-  return size;
-}
-#endif
-
 /**
  * @brief Write a value to an MCP23S17 register
  * @param reg: Register address
@@ -381,8 +314,6 @@ int main(void)
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
-  Debug_LED_RawInit();
-
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -390,18 +321,35 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 
-
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_USB_PCD_Init();
+  MX_SPI2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   
-  Debug_RawPulse(3);
-  UART_DebugRaw("UART ONLY TEST START\r\n");
+  // Initialize the onboard LED
+  BSP_LED_Init(LED_GREEN);
+  
+  // Initialize TinyUSB
+  tusb_init();
+  
+  // Initialize MCP23S17 I/O expander for button matrix
+  MCP23S17_Init();
+  
+  // Initialize button states
+  for (uint8_t r = 0; r < MATRIX_ROWS; r++) {
+    for (uint8_t c = 0; c < MATRIX_COLS; c++) {
+      button_matrix[r][c].current_state = false;
+      button_matrix[r][c].previous_state = false;
+      button_matrix[r][c].last_change_time = 0;
+      button_matrix[r][c].debounce_stable = false;
+    }
+  }
 
   /* USER CODE END 2 */
 
@@ -410,24 +358,14 @@ int main(void)
   
   while (1)
   {
-    static const uint8_t tx_msg[] = "UART heartbeat\r\n";
-    HAL_StatusTypeDef tx_status = HAL_UART_Transmit(&huart2, (uint8_t *)tx_msg, (uint16_t)(sizeof(tx_msg) - 1U), 100U);
-
-    if (tx_status == HAL_OK) {
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-      HAL_Delay(60);
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-      HAL_Delay(60);
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-      HAL_Delay(60);
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-      HAL_Delay(820);
-    } else {
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-      HAL_Delay(700);
-      HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-      HAL_Delay(300);
-    }
+    // TinyUSB device task - handles USB communication
+    tud_task();
+    
+    // Scan button matrix for changes
+    ScanButtonMatrix();
+    
+    // Process button events and send MIDI messages
+    ProcessButtonEvents();
     
     /* USER CODE END WHILE */
 
@@ -683,18 +621,9 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  Debug_LED_RawInit();
   __disable_irq();
   while (1)
   {
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-    Debug_BusyWait(900000U);
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-    Debug_BusyWait(900000U);
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_SET);
-    Debug_BusyWait(900000U);
-    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
-    Debug_BusyWait(3500000U);
   }
   /* USER CODE END Error_Handler_Debug */
 }
