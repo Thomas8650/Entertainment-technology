@@ -1,5 +1,5 @@
-opdracht1/stm32h5xx_hal_usart.o: \
-  ..\Drivers\STM32H5xx_HAL_Driver\Src\stm32h5xx_hal_usart.c \
+opdracht1/stm32h5xx_hal_icache.o: \
+  ..\Drivers\STM32H5xx_HAL_Driver\Src\stm32h5xx_hal_icache.c \
   ..\Drivers\STM32H5xx_HAL_Driver\Inc\stm32h5xx_hal.h \
   ..\Core\Inc\stm32h5xx_hal_conf.h \
   ..\Drivers\STM32H5xx_HAL_Driver\Inc\stm32h5xx_hal_rcc.h \
